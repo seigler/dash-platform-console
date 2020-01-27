@@ -1,14 +1,11 @@
 import Vue from 'vue';
 import Vuex from 'vuex';
 import createPersistedState from 'vuex-persistedstate';
-import DashDemoSDK from 'evo-net-demo';
+import Dash from 'dash';
 
 Vue.use(Vuex);
 
-const demoSDK = new DashDemoSDK();
-const seeds = [
-  { service: '18.236.131.253' },
-];
+let demoSDK;
 
 export const identityTypes = {
   application: {
@@ -79,14 +76,12 @@ export default new Vuex.Store({
   },
   actions: {
     async createIdentity({ commit }, type) {
-      const identityId = await demoSDK.registerIdentity(type);
-      const identity = await demoSDK.getIdentityFromNetwork(identityId);
+      const identityId = await demoSDK.platform.identities.register(type);
+      const identity = await demoSDK.platform.identities.get(identityId);
       commit('addIdentity', { identity, type: identity.getType() });
     },
     async registerName({ commit }, { identity, name }) {
-      await new Promise((resolve) => {
-        setTimeout(() => resolve(name), 2000);
-      });
+      await demoSDK.platform.names.register(identity, name);
       commit('addName', { identity, name });
     },
     async registerContract({ commit }, { identity, json }) {
@@ -102,22 +97,26 @@ export default new Vuex.Store({
       console.debug('Start wallet sync...');
 
       try {
-        await demoSDK.init({ mnemonic, seeds });
+        demoSDK = new Dash.SDK({
+          mnemonic,
+          network: 'testnet',
+        });
+        await demoSDK.isReady();
       } catch (e) {
         console.debug('Wallet synchronized with an error:');
         console.error(e);
         commit('setError', e);
         commit('setSyncing', false);
-        demoSDK.account.disconnect();
+        demoSDK.disconnect();
         return;
       }
 
       console.debug('Wallet is synchronized');
 
       commit('setSyncing', false);
-      demoSDK.listIdentities().forEach((identity) => {
-        commit('addIdentity', { identity, type: identity.getType() });
-      });
+      // demoSDK.listIdentities().forEach((identity) => {
+      //   commit('addIdentity', { identity, type: identity.getType() });
+      // });
     },
   },
   getters: {
